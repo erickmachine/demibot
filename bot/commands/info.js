@@ -1,79 +1,150 @@
-import os from 'os'
+const os = require("os");
+const moment = require("moment");
 
-export async function handleInfo(ctx) {
-  const {
-    sock,
-    groupId,
-    sender,
-    pushName,
-    isGroup,
-    prefix = '!',
-    owner = 'Não definido'
-  } = ctx
+module.exports = {
+    name: "info",
+    description: "Menu de informações",
+    commands: [
+        "info",
+        "ping",
+        "dono",
+        "idiomas",
+        "tabela",
+        "tabelagp",
+        "gpinfo",
+        "perfil",
+        "me",
+        "check",
+        "admins",
+        "infocmd",
+        "configurar-bot"
+    ],
 
-  try {
-    // ⏱️ Uptime
-    const uptimeSeconds = process.uptime()
-    const hours = Math.floor(uptimeSeconds / 3600)
-    const minutes = Math.floor((uptimeSeconds % 3600) / 60)
-    const seconds = Math.floor(uptimeSeconds % 60)
+    execute: async ({ sock, msg, args, command, from, sender, isGroup, groupMetadata }) => {
 
-    // 💾 Memória
-    const totalMem = (os.totalmem() / 1024 / 1024 / 1024).toFixed(2)
-    const freeMem = (os.freemem() / 1024 / 1024 / 1024).toFixed(2)
+        switch (command) {
 
-    // 🖥️ CPU
-    const cpuModel = os.cpus()[0].model
-    const cpuCores = os.cpus().length
+            case "info":
+                return sock.sendMessage(from, {
+                    text: `
+━━━━━━━━━━━━━━━
+👻 *𝐃𝐞𝐦𝐢𝐁𝐨𝐭* 👻
 
-    // 👥 Info do grupo
-    let groupInfoText = ''
-    if (isGroup) {
-      const metadata = await sock.groupMetadata(groupId)
-      groupInfoText = `
-👥 *Grupo:* ${metadata.subject}
-👤 *Participantes:* ${metadata.participants.length}
+*MENU INFORMACOES*
+━━━━━━━━━━━━━━━
+
+┃ ⎨⎟⟐⃟➪  #info - Info do bot
+┃ ⎨⎟⟐⃟➪  #ping - Velocidade do bot
+┃ ⎨⎟⟐⃟➪  #dono - Info da dona
+┃ ⎨⎟⟐⃟➪  #idiomas - Idiomas disponiveis
+┃ ⎨⎟⟐⃟➪  #tabela - Tabela do grupo
+┃ ⎨⎟⟐⃟➪  #tabelagp - Info do grupo
+┃ ⎨⎟⟐⃟➪  #gpinfo - Info completa grupo
+┃ ⎨⎟⟐⃟➪  #perfil - Seu perfil
+┃ ⎨⎟⟐⃟➪  #me - Suas estatisticas
+┃ ⎨⎟⟐⃟➪  #check @user - Info do membro
+┃ ⎨⎟⟐⃟➪  #admins - Lista de admins
+┃ ⎨⎟⟐⃟➪  #infocmd <cmd> - Info do comando
+┃ ⎨⎟⟐⃟➪  #configurar-bot - Como configurar
+
+╰━━─ ≪ •❈• ≫ ─━━╯
 `
+                });
+
+            case "ping":
+                const start = Date.now();
+                const end = Date.now();
+                return sock.sendMessage(from, {
+                    text: `🏓 Pong!\nVelocidade: ${end - start}ms`
+                });
+
+            case "dono":
+                return sock.sendMessage(from, {
+                    text: `👑 Dono do bot:\n@${process.env.OWNER_NUMBER || "559299652961"}`,
+                    mentions: [`${process.env.OWNER_NUMBER || "559299652961"}@s.whatsapp.net`]
+                });
+
+            case "idiomas":
+                return sock.sendMessage(from, {
+                    text: `🌎 Idiomas disponíveis:\n• Português\n• English (em breve)`
+                });
+
+            case "tabela":
+            case "tabelagp":
+                if (!isGroup) return sock.sendMessage(from, { text: "❌ Comando apenas para grupos." });
+                return sock.sendMessage(from, {
+                    text: `📋 Tabela do grupo:\nTotal membros: ${groupMetadata.participants.length}`
+                });
+
+            case "gpinfo":
+                if (!isGroup) return sock.sendMessage(from, { text: "❌ Comando apenas para grupos." });
+
+                return sock.sendMessage(from, {
+                    text: `
+📌 *Informações do Grupo*
+
+Nome: ${groupMetadata.subject}
+Membros: ${groupMetadata.participants.length}
+Criado em: ${moment(groupMetadata.creation * 1000).format("DD/MM/YYYY")}
+`
+                });
+
+            case "perfil":
+            case "me":
+                return sock.sendMessage(from, {
+                    text: `
+👤 *Seu Perfil*
+
+Número: ${sender.split("@")[0]}
+Sistema: ${os.platform()}
+Hora: ${moment().format("HH:mm:ss")}
+`
+                });
+
+            case "check":
+                if (!msg.message.extendedTextMessage?.contextInfo?.mentionedJid)
+                    return sock.sendMessage(from, { text: "❌ Marque um usuário." });
+
+                const user = msg.message.extendedTextMessage.contextInfo.mentionedJid[0];
+
+                return sock.sendMessage(from, {
+                    text: `🔎 Informações de @${user.split("@")[0]}`,
+                    mentions: [user]
+                });
+
+            case "admins":
+                if (!isGroup) return sock.sendMessage(from, { text: "❌ Apenas em grupo." });
+
+                const admins = groupMetadata.participants
+                    .filter(p => p.admin)
+                    .map(p => `@${p.id.split("@")[0]}`);
+
+                return sock.sendMessage(from, {
+                    text: `👮 *Admins do Grupo:*\n\n${admins.join("\n")}`,
+                    mentions: groupMetadata.participants
+                        .filter(p => p.admin)
+                        .map(p => p.id)
+                });
+
+            case "infocmd":
+                if (!args[0])
+                    return sock.sendMessage(from, { text: "❌ Use: #infocmd nomeDoComando" });
+
+                return sock.sendMessage(from, {
+                    text: `ℹ️ Informações do comando: ${args[0]}\nDescrição não configurada.`
+                });
+
+            case "configurar-bot":
+                return sock.sendMessage(from, {
+                    text: `
+⚙️ *Como configurar o bot*
+
+1. Edite o arquivo config.js
+2. Defina OWNER_NUMBER
+3. Reinicie com: pm2 restart demibot
+`
+                });
+
+        }
     }
-
-    const message = `
-🤖 *INFORMAÇÕES DO BOT*
-
-👤 *Usuário:* ${pushName || 'Desconhecido'}
-🆔 *ID:* ${sender}
-
-${groupInfoText}
-
-⚙️ *Sistema*
-🖥️ CPU: ${cpuModel}
-🧠 Núcleos: ${cpuCores}
-💾 RAM Total: ${totalMem} GB
-📉 RAM Livre: ${freeMem} GB
-
-⏱️ *Uptime:* ${hours}h ${minutes}m ${seconds}s
-
-👑 *Dono:* ${owner}
-🔑 *Prefixo:* ${prefix}
-
-📜 *Comandos Disponíveis:*
-${prefix}play
-${prefix}audio
-${prefix}fig
-${prefix}info
-${prefix}menu
-${prefix}ping
-${prefix}ytmp3
-${prefix}ytmp4
-
-🔥 Bot online e funcionando!
-`
-
-    await sock.sendMessage(groupId, { text: message })
-
-  } catch (error) {
-    console.error('Erro no comando info:', error)
-    await sock.sendMessage(groupId, {
-      text: '❌ Erro ao obter informações.'
-    })
-  }
-}
+};
