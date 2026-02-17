@@ -1,0 +1,5 @@
+auth/
+data/
+*.db
+*.mp4
+node_modules/
