@@ -19,7 +19,7 @@ export const commands = [
     "configurar-bot"
 ];
 
-export async function execute({ sock, msg, args, command, from, sender, isGroup, groupMetadata }) {
+export async function handleInfo({ sock, msg, args, command, from, sender, isGroup, groupMetadata }) {
     switch (command) {
         case "info":
             await sock.sendMessage(from, {
