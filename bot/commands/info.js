@@ -1,7 +1,7 @@
-const os = require("os");
-const moment = require("moment");
+import os from "os";
+import moment from "moment";
 
-module.exports = {
+const info = {
     name: "info",
     description: "Menu de informações",
     commands: [
@@ -59,9 +59,10 @@ module.exports = {
                 });
 
             case "dono":
+                const owner = process.env.OWNER_NUMBER || "559299652961";
                 return sock.sendMessage(from, {
-                    text: `👑 Dono do bot:\n@${process.env.OWNER_NUMBER || "559299652961"}`,
-                    mentions: [`${process.env.OWNER_NUMBER || "559299652961"}@s.whatsapp.net`]
+                    text: `👑 Dono do bot:\n@${owner}`,
+                    mentions: [`${owner}@s.whatsapp.net`]
                 });
 
             case "idiomas":
@@ -71,13 +72,16 @@ module.exports = {
 
             case "tabela":
             case "tabelagp":
-                if (!isGroup) return sock.sendMessage(from, { text: "❌ Comando apenas para grupos." });
+                if (!isGroup)
+                    return sock.sendMessage(from, { text: "❌ Comando apenas para grupos." });
+
                 return sock.sendMessage(from, {
                     text: `📋 Tabela do grupo:\nTotal membros: ${groupMetadata.participants.length}`
                 });
 
             case "gpinfo":
-                if (!isGroup) return sock.sendMessage(from, { text: "❌ Comando apenas para grupos." });
+                if (!isGroup)
+                    return sock.sendMessage(from, { text: "❌ Comando apenas para grupos." });
 
                 return sock.sendMessage(from, {
                     text: `
@@ -113,7 +117,8 @@ Hora: ${moment().format("HH:mm:ss")}
                 });
 
             case "admins":
-                if (!isGroup) return sock.sendMessage(from, { text: "❌ Apenas em grupo." });
+                if (!isGroup)
+                    return sock.sendMessage(from, { text: "❌ Apenas em grupo." });
 
                 const admins = groupMetadata.participants
                     .filter(p => p.admin)
@@ -144,7 +149,8 @@ Hora: ${moment().format("HH:mm:ss")}
 3. Reinicie com: pm2 restart demibot
 `
                 });
-
         }
     }
 };
+
+export default info;
