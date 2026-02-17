@@ -22,22 +22,47 @@ async function downloadBuffer(url, headers = {}) {
 
 // Helper: busca video/audio com yt-dlp
 function ytdlp(url, format = 'bestaudio', extra = '') {
-  const output = path.join(tempDir, `dl_${Date.now()}`)
-  const ext = format.includes('audio') ? 'mp3' : 'mp4'
-  const outFile = `${output}.${ext}`
-  const cmd = format.includes('audio')
-    ? `yt-dlp -x --audio-format mp3 -o "${output}.%(ext)s" ${extra} "${url}"`
-    : `yt-dlp -f "bestvideo[height<=720]+bestaudio/best[height<=720]" --merge-output-format mp4 -o "${output}.%(ext)s" ${extra} "${url}"`
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true })
+  }
+
+  const timestamp = Date.now()
+  const outputBase = path.join(tempDir, `dl_${timestamp}`)
+
+  const isAudio = format.includes('audio')
+  const ext = isAudio ? 'mp3' : 'mp4'
+
+  const baseFlags = `
+--no-playlist
+--no-check-certificate
+--force-ipv4
+--prefer-free-formats
+--user-agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+`
+
+  const command = isAudio
+    ? `yt-dlp ${baseFlags} -x --audio-format mp3 -o "${outputBase}.%(ext)s" ${extra} "${url}"`
+    : `yt-dlp ${baseFlags} -f "bv*[height<=720]+ba/b[height<=720]" --merge-output-format mp4 -o "${outputBase}.%(ext)s" ${extra} "${url}"`
+
   try {
-    execSync(cmd, { timeout: 120000, stdio: 'pipe' })
-    // yt-dlp pode gerar com extensao diferente
-    const files = fs.readdirSync(tempDir).filter(f => f.startsWith(path.basename(output)))
-    if (files.length > 0) {
-      return path.join(tempDir, files[0])
+    execSync(command, {
+      timeout: 180000,
+      stdio: 'pipe',
+      maxBuffer: 1024 * 1024 * 50
+    })
+
+    const files = fs.readdirSync(tempDir)
+      .filter(f => f.startsWith(`dl_${timestamp}`))
+
+    if (!files.length) {
+      throw new Error('Arquivo não encontrado após download.')
     }
-    return outFile
-  } catch (e) {
-    throw new Error('Falha ao baixar com yt-dlp: ' + e.message?.substring(0, 100))
+
+    return path.join(tempDir, files[0])
+
+  } catch (err) {
+    const errorMsg = err.stderr?.toString() || err.message
+    throw new Error(errorMsg.substring(0, 500))
   }
 }
 
