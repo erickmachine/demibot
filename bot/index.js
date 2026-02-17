@@ -27,7 +27,7 @@ import { handleDownload } from './commands/download.js'
 import { handleGames } from './commands/games.js'
 import { handleGold } from './commands/gold.js'
 import { handleEffects } from './commands/effects.js'
-import { handleInfo } from './commands/info.js'
+import info from './commands/info.js'
 import { handleGroup } from './commands/group.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
