@@ -1,8 +1,7 @@
 import os from "os";
 
-const info = {
+export default {
     name: "info",
-    description: "Menu de informações",
     commands: [
         "info",
         "ping",
@@ -24,88 +23,23 @@ const info = {
         switch (command) {
 
             case "info":
-                return sock.sendMessage(from, {
-                    text: `
-━━━━━━━━━━━━━━━
-👻 *𝐃𝐞𝐦𝐢𝐁𝐨𝐭* 👻
-━━━━━━━━━━━━━━━
+                return sock.sendMessage(from, { text: "👻 DemiBot Online" });
 
-#info
-#ping
-#dono
-#idiomas
-#tabela
-#tabelagp
-#gpinfo
-#perfil
-#me
-#check @user
-#admins
-#infocmd comando
-#configurar-bot
-`
-                });
+            case "ping":
+                return sock.sendMessage(from, { text: "🏓 Pong!" });
 
-            case "ping": {
-                const start = Date.now();
-                const end = Date.now();
-                return sock.sendMessage(from, {
-                    text: `🏓 Pong!\nVelocidade: ${end - start}ms`
-                });
-            }
-
-            case "dono": {
+            case "dono":
                 const owner = process.env.OWNER_NUMBER || "559299652961";
                 return sock.sendMessage(from, {
-                    text: `👑 Dono do bot:\n@${owner}`,
+                    text: `👑 Dono: @${owner}`,
                     mentions: [`${owner}@s.whatsapp.net`]
                 });
-            }
 
-            case "idiomas":
-                return sock.sendMessage(from, {
-                    text: "🌎 Idiomas disponíveis:\n• Português\n• English (em breve)"
-                });
-
-            case "tabela":
-            case "tabelagp":
-                if (!isGroup)
-                    return sock.sendMessage(from, { text: "❌ Apenas em grupo." });
-
-                return sock.sendMessage(from, {
-                    text: `📋 Total de membros: ${groupMetadata.participants.length}`
-                });
-
-            case "gpinfo":
-                if (!isGroup)
-                    return sock.sendMessage(from, { text: "❌ Apenas em grupo." });
-
-                return sock.sendMessage(from, {
-                    text: `
-📌 Grupo: ${groupMetadata.subject}
-👥 Membros: ${groupMetadata.participants.length}
-`
-                });
-
-            case "perfil":
-            case "me":
-                return sock.sendMessage(from, {
-                    text: `
-👤 Número: ${sender?.split("@")[0]}
-💻 Sistema: ${os.platform()}
-🕒 Hora: ${new Date().toLocaleTimeString()}
-`
-                });
-
-            case "check":
-                if (!msg?.message?.extendedTextMessage?.contextInfo?.mentionedJid)
-                    return sock.sendMessage(from, { text: "❌ Marque um usuário." });
-
-                const user = msg.message.extendedTextMessage.contextInfo.mentionedJid[0];
-
-                return sock.sendMessage(from, {
-                    text: `🔎 Informações de @${user.split("@")[0]}`,
-                    mentions: [user]
+            default:
+                return;
+        }
+    }
+};                    mentions: [user]
                 });
 
             case "admins":
