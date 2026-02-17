@@ -1,5 +1,4 @@
 import os from "os";
-import moment from "moment";
 
 const info = {
     name: "info",
@@ -29,25 +28,19 @@ const info = {
                     text: `
 ━━━━━━━━━━━━━━━
 👻 *𝐃𝐞𝐦𝐢𝐁𝐨𝐭* 👻
-
-*MENU INFORMACOES*
 ━━━━━━━━━━━━━━━
 
-┃ ⎨⎟⟐⃟➪  #info - Info do bot
-┃ ⎨⎟⟐⃟➪  #ping - Velocidade do bot
-┃ ⎨⎟⟐⃟➪  #dono - Info da dona
-┃ ⎨⎟⟐⃟➪  #idiomas - Idiomas disponiveis
-┃ ⎨⎟⟐⃟➪  #tabela - Tabela do grupo
-┃ ⎨⎟⟐⃟➪  #tabelagp - Info do grupo
-┃ ⎨⎟⟐⃟➪  #gpinfo - Info completa grupo
-┃ ⎨⎟⟐⃟➪  #perfil - Seu perfil
-┃ ⎨⎟⟐⃟➪  #me - Suas estatisticas
-┃ ⎨⎟⟐⃟➪  #check @user - Info do membro
-┃ ⎨⎟⟐⃟➪  #admins - Lista de admins
-┃ ⎨⎟⟐⃟➪  #infocmd <cmd> - Info do comando
-┃ ⎨⎟⟐⃟➪  #configurar-bot - Como configurar
-
-╰━━─ ≪ •❈• ≫ ─━━╯
+#info
+#ping
+#dono
+#idiomas
+#tabela
+#gpinfo
+#perfil
+#check
+#admins
+#infocmd
+#configurar-bot
 `
                 });
 
@@ -73,23 +66,20 @@ const info = {
             case "tabela":
             case "tabelagp":
                 if (!isGroup)
-                    return sock.sendMessage(from, { text: "❌ Comando apenas para grupos." });
+                    return sock.sendMessage(from, { text: "❌ Apenas em grupo." });
 
                 return sock.sendMessage(from, {
-                    text: `📋 Tabela do grupo:\nTotal membros: ${groupMetadata.participants.length}`
+                    text: `📋 Total de membros: ${groupMetadata.participants.length}`
                 });
 
             case "gpinfo":
                 if (!isGroup)
-                    return sock.sendMessage(from, { text: "❌ Comando apenas para grupos." });
+                    return sock.sendMessage(from, { text: "❌ Apenas em grupo." });
 
                 return sock.sendMessage(from, {
                     text: `
-📌 *Informações do Grupo*
-
-Nome: ${groupMetadata.subject}
-Membros: ${groupMetadata.participants.length}
-Criado em: ${moment(groupMetadata.creation * 1000).format("DD/MM/YYYY")}
+📌 Grupo: ${groupMetadata.subject}
+👥 Membros: ${groupMetadata.participants.length}
 `
                 });
 
@@ -97,15 +87,61 @@ Criado em: ${moment(groupMetadata.creation * 1000).format("DD/MM/YYYY")}
             case "me":
                 return sock.sendMessage(from, {
                     text: `
-👤 *Seu Perfil*
-
-Número: ${sender.split("@")[0]}
-Sistema: ${os.platform()}
-Hora: ${moment().format("HH:mm:ss")}
+👤 Número: ${sender.split("@")[0]}
+💻 Sistema: ${os.platform()}
+🕒 Hora: ${new Date().toLocaleTimeString()}
 `
                 });
 
             case "check":
+                if (!msg.message?.extendedTextMessage?.contextInfo?.mentionedJid)
+                    return sock.sendMessage(from, { text: "❌ Marque um usuário." });
+
+                const user = msg.message.extendedTextMessage.contextInfo.mentionedJid[0];
+
+                return sock.sendMessage(from, {
+                    text: `🔎 Informações de @${user.split("@")[0]}`,
+                    mentions: [user]
+                });
+
+            case "admins":
+                if (!isGroup)
+                    return sock.sendMessage(from, { text: "❌ Apenas em grupo." });
+
+                const admins = groupMetadata.participants
+                    .filter(p => p.admin)
+                    .map(p => `@${p.id.split("@")[0]}`);
+
+                return sock.sendMessage(from, {
+                    text: `👮 Admins:\n\n${admins.join("\n")}`,
+                    mentions: groupMetadata.participants
+                        .filter(p => p.admin)
+                        .map(p => p.id)
+                });
+
+            case "infocmd":
+                if (!args[0])
+                    return sock.sendMessage(from, { text: "❌ Use: #infocmd comando" });
+
+                return sock.sendMessage(from, {
+                    text: `ℹ️ Informações do comando: ${args[0]}`
+                });
+
+            case "configurar-bot":
+                return sock.sendMessage(from, {
+                    text: `
+⚙️ Configuração:
+
+1. Edite config.js
+2. Defina OWNER_NUMBER
+3. pm2 restart demibot
+`
+                });
+        }
+    }
+};
+
+export default info;            case "check":
                 if (!msg.message.extendedTextMessage?.contextInfo?.mentionedJid)
                     return sock.sendMessage(from, { text: "❌ Marque um usuário." });
 
