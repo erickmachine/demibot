@@ -1,0 +1,8 @@
+ignoredBuiltDependencies:
+  - protobufjs
+
+onlyBuiltDependencies:
+  - '@whiskeysockets/baileys'
+  - better-sqlite3
+  - sharp
+  - yt-dlp-exec
