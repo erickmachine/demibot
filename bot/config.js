@@ -6,7 +6,7 @@
 export default {
   // Informacoes do Bot
   botName: 'DemiBot',
-  ownerNumber: '5511999999999@s.whatsapp.net', // Numero da dona do grupo
+  ownerNumber: '559299652961@s.whatsapp.net', // Numero da dona do grupo
   ownerName: 'Dona',
   
   // Prefixos aceitos (multiprefixo)
@@ -34,7 +34,7 @@ export default {
   
   // Identidade visual Demi Lovato
   demiTheme: {
-    emoji: '🦋',
+    emoji: '👻',
     greeting: '𝐃𝐞𝐦𝐢𝐁𝐨𝐭',
     separator: '━━━━━━━━━━━━━━━',
     headerDecor: '⎨⎟⟐⃟➪',
@@ -64,7 +64,7 @@ export default {
   
   // APIs externas (configurar conforme necessario)
   apis: {
-    removeBg: '', // API key removebg
+    removeBg: 'MgL7kTucQvneKm211qbDddgB', // API key removebg
     openai: '', // API key OpenAI/GPT
     gemini: '', // API key Google Gemini
     weather: '', // API key OpenWeather
