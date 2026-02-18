@@ -86,7 +86,6 @@ async function startBot() {
   // ============================================================
   cron.schedule(config.goodMorningCron, async () => {
     const msg = randomChoice(config.goodMorningMessages)
-    // Envia para todos os grupos que o bot participa
     try {
       const groups = await sock.groupFetchAllParticipating()
       for (const groupId of Object.keys(groups)) {
@@ -107,7 +106,6 @@ async function startBot() {
     for (const sched of scheduled) {
       try {
         if (cron.validate(sched.cronExpression)) {
-          // Checa se o cron bate com o momento atual (simplificado)
           const job = cron.schedule(sched.cronExpression, async () => {
             if (sched.mediaPath && fs.existsSync(sched.mediaPath)) {
               const media = fs.readFileSync(sched.mediaPath)
@@ -141,7 +139,6 @@ async function startBot() {
 
         // Ignora se nao eh grupo
         if (!isGrp) {
-          // Advertir quem chamar no privado (opcional)
           await sock.sendMessage(from, {
             text: `${botHeader('AVISO')}\nEste bot funciona apenas em grupos!\nNao me chame no privado.${botFooter()}`
           })
@@ -276,7 +273,7 @@ async function startBot() {
           }
         }
 
-        // Anti-midia (imagem, video, audio, doc, sticker, contato, localizacao)
+        // Anti-midia
         const antiMediaChecks = [
           { setting: 'antiimg', type: 'imageMessage', label: 'Imagens' },
           { setting: 'antivideo', type: 'videoMessage', label: 'Videos' },
@@ -324,7 +321,7 @@ async function startBot() {
           continue
         }
 
-        // X9 view once - revelar mensagem de visualizacao unica
+        // X9 view once
         if (grpSettings.x9viewonce && msg.isViewOnce) {
           try {
             const viewOnceMsg = msg.viewOnceMessage
@@ -362,18 +359,20 @@ async function startBot() {
           } catch {}
         }
 
-        // AFK check - se alguem mencionou um usuario AFK
-        for (const mentioned of msg.mentionedJid) {
-          const memberData = db.getMember(groupId, mentioned)
-          if (memberData.isAfk) {
-            await sock.sendMessage(groupId, {
-              text: `${mention(mentioned)} esta AFK: ${memberData.afkReason || 'Sem motivo'}`,
-              mentions: [mentioned]
-            })
+        // AFK check
+        if (msg.mentionedJid) {
+          for (const mentioned of msg.mentionedJid) {
+            const memberData = db.getMember(groupId, mentioned)
+            if (memberData.isAfk) {
+              await sock.sendMessage(groupId, {
+                text: `${mention(mentioned)} esta AFK: ${memberData.afkReason || 'Sem motivo'}`,
+                mentions: [mentioned]
+              })
+            }
           }
         }
 
-        // Se o proprio usuario que mandou msg esta AFK, remove o AFK
+        // Se o usuario que mandou msg esta AFK, remove
         const senderMember = db.getMember(groupId, sender)
         if (senderMember.isAfk) {
           db.updateMember(groupId, sender, { isAfk: 0, afkReason: '' })
@@ -430,6 +429,11 @@ async function startBot() {
 
         // ============================================================
         //  ROTEAMENTO DE COMANDOS
+        //
+        //  IMPORTANTE: A ordem importa! Comandos que aparecem em
+        //  multiplas listas devem estar apenas na lista correta.
+        //  - kiss/slap/ship -> effects (com imagem/gif)
+        //  - beijo/tapa/chute -> games (interacao social texto)
         // ============================================================
 
         // MENUS
@@ -439,8 +443,7 @@ async function startBot() {
           'menubaixar', 'menufig', 'menuvip', 'menugame', 'menudono', 'menurpg',
           'configurarbot', 'configurar-bot']
         if (menuCmds.includes(cmd)) {
-          const result = handleMenu(cmd, { ...msg, args }, sock)
-          await sock.sendMessage(groupId, { text: result })
+          await handleMenu(ctx)
           continue
         }
 
@@ -481,7 +484,7 @@ async function startBot() {
           'verlimites', 'limparlimites', 'listanti',
           'addcmdgold', 'rmcmdgold', 'delcmdgold', 'addcmdpremium', 'tirarcmdpremium', 'cmdpremium',
           'adddono', 'dononogrupo', 'modoparceria', 'add_parceria', 'del_parceria', 'parceria',
-          'criartabela', 'remover-tabela', 'tabelagp',
+          'criartabela', 'remover-tabela',
           'zerarrank', 'zerar_duelo', 'resetdamas', 'resetvelha', 'resetlevel',
           'zerar_gold', 'addgold', 'addxp',
           'autoban', 'admautoban', 'limite-msg-auto',
@@ -516,9 +519,10 @@ async function startBot() {
           'fig', 'figurinhas', 'figanime', 'figroblox', 'figmeme', 'figdesenho',
           'figemoji', 'figraiva', 'figcoreana', 'figengracada', 'funny',
           'packfig', 'packsfigs', 'pesquisarfig',
-          'bully', 'cuddle', 'cry', 'hug', 'awoo', 'kiss', 'lick', 'pat',
+          // Anime reactions (sticker via waifu.pics - diferente de kiss/slap effects)
+          'bully', 'cuddle', 'cry', 'hug', 'awoo', 'lick', 'pat',
           'smug', 'bonk', 'yeet', 'blush', 'smile', 'wave', 'highfive',
-          'handhold', 'nom', 'bite', 'glomp', 'slap', 'kill', 'happy',
+          'handhold', 'nom', 'bite', 'glomp', 'happy',
           'wink', 'poke', 'dance', 'cringe',
           'placaloli',
         ]
@@ -549,7 +553,6 @@ async function startBot() {
           'audiocontrario',
           'gerarlink', 'gerarlink2',
           'audio-menu',
-          'legenda_video',
         ]
         if (downloadCmds.includes(cmd)) {
           await handleDownload(ctx)
@@ -571,6 +574,7 @@ async function startBot() {
           'proxjogo', 'tabelacamp', 'ultimosjogos', 'placares',
           'enviarcachaca', 'resetarcc',
           'casamento', 'casal', 'recusar', 'entrar',
+          // Interacoes sociais (texto, sem imagem/gif)
           'matar', 'beijo', 'tapa', 'chute', 'abraco',
           'corno', 'gado', 'gostoso', 'gostosa', 'gay',
           'vesgo', 'bebado', 'feio', 'nazista', 'golpe', 'dogolpe',
@@ -578,6 +582,7 @@ async function startBot() {
           'imc', 'webcorno', 'ceu', 'inferno',
           'anagrama', 'revelar_anagrama', 'revelar_gartic', 'revelar_enigma',
           'simi', 'bot',
+          'jv', // jogada do jogo da velha
         ]
         if (gamesCmds.includes(cmd)) {
           await handleGames(ctx)
@@ -602,15 +607,22 @@ async function startBot() {
           continue
         }
 
-        // EFEITOS
+        // EFEITOS (imagem, audio, texto/logos, marcacao, anime)
         const effectsCmds = [
+          // Interacoes com imagem/gif (waifu.pics)
           'kiss', 'kissme', 'ship', 'shipme', 'slap', 'spank',
+          'batslap',
+          // Efeitos de imagem
           'triggered', 'delete', 'jail', 'wasted', 'blur',
-          'greyscale', 'sepia', 'invert', 'clown', 'batslap',
+          'greyscale', 'sepia', 'invert', 'clown',
           'beautiful', 'bobross', 'ad',
+          'upscale', 'hd', 'crimg', 'circulo',
+          // Marcacao com imagem
           'lixo', 'lgbt', 'morto', 'preso', 'deletem', 'procurado', 'hitler',
           'borrar', 'merda',
+          // Audio para texto
           'totext', 'bs64',
+          // Efeitos de audio
           'grave', 'grave2', 'bass', 'bass2', 'bass3',
           'estourar', 'estourar2', 'fast', 'esquilo', 'slow',
           'reverse', 'fat', 'alto', 'deep', 'deep1', 'speedup',
@@ -630,7 +642,7 @@ async function startBot() {
           'transformer', 'demonfire', 'jeans', 'metalblue', 'natal',
           'ossos', 'asfalto', 'break', 'glitch2', 'colaq', 'nuvem',
           'neve', 'lapis', 'demongreen', 'halloween',
-          'circulo', 'upscale', 'hd', 'crimg',
+          // Outros
           'metadinha', 'adolesc',
         ]
         if (effectsCmds.includes(cmd)) {
@@ -659,7 +671,7 @@ async function startBot() {
           'playstore', 'aptoide', 'aptoide_pesquisa',
           'printsite', 'lastfm',
           'filme', 'serie', 'book',
-          'avalie', 'bug', 'sugestao', 'sugestão',
+          'avalie', 'bug', 'sugestao',
           'convite', 'listavip',
           'npm', 'bingimg', 'criarimg',
           'legenda', 'contar', 'sender',
@@ -674,8 +686,7 @@ async function startBot() {
           'alugar', 'aluguel',
           'ativacoes', 'logos1',
           'listacomunidades',
-          'sorte', 'signo',
-          'listavip',
+          'tabelagp',
         ]
         if (infoCmds.includes(cmd)) {
           await handleInfo(ctx)
@@ -697,7 +708,7 @@ async function startBot() {
           continue
         }
 
-        // ANIME
+        // ANIME (roteado para effects - busca imagens)
         const animeCmds = [
           'animeinfo', 'waifu', 'neko', 'loli', 'megumin',
           'goku', 'nezuko', 'makima', 'kaguya', 'nagatoro',
@@ -707,7 +718,7 @@ async function startBot() {
           'yuta', 'mitsuri', 'yoruichi', 'rukia', 'fubuki', 'anya',
         ]
         if (animeCmds.includes(cmd)) {
-          await handleEffects(ctx) // anime images handled in effects
+          await handleEffects(ctx)
           continue
         }
 
@@ -788,7 +799,6 @@ async function startBot() {
         }
 
         if (action === 'remove') {
-          // Despedida
           if (grpSettings.welcome) {
             let goodbyeMsg = grpSettings.legendaSaiu || 'Saiu do grupo...'
             goodbyeMsg = goodbyeMsg
@@ -813,7 +823,6 @@ async function startBot() {
             }
           }
 
-          // Remove dados do membro
           db.deleteMember(id, participant)
         }
 
