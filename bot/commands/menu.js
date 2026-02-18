@@ -1,12 +1,17 @@
 // ============================================================
 //  COMANDOS DE MENU
+//  Recebe ctx padrao e envia o menu como mensagem
 // ============================================================
 import config from '../config.js'
 import { buildMenu, botHeader, botFooter } from '../lib/utils.js'
 
-export function handleMenu(cmd, msg, sock) {
-  const t = config.demiTheme
-  const p = '#'
+export async function handleMenu(ctx) {
+  const { sock, cmd, args, groupId, grpSettings } = ctx
+
+  const reply = async (text) => sock.sendMessage(groupId, { text })
+
+  // Prefixo que sera exibido nos menus
+  const p = grpSettings?.prefix || config.prefix || '#'
 
   const menus = {
     menu: {
@@ -335,11 +340,81 @@ export function handleMenu(cmd, msg, sock) {
         `${p}morto @user - Morto`,
       ],
     },
+
+    vip: {
+      title: 'MENU VIP',
+      items: [
+        `${p}premium - Ver status premium`,
+        `${p}lojagold - Comprar VIP com gold`,
+      ],
+    },
+
+    game: {
+      title: 'MENU GAMES',
+      items: [
+        `${p}ppt - Pedra Papel Tesoura`,
+        `${p}jogodavelha - Jogo da velha`,
+        `${p}iniciar_forca - Forca`,
+        `${p}roleta - Roleta russa`,
+        `${p}cassino - Cassino gold`,
+      ],
+    },
+
+    dono: {
+      title: 'MENU DONO',
+      items: [
+        `${p}bc <msg> - Broadcast para todos os grupos`,
+        `${p}join <link> - Entrar em grupo`,
+        `${p}sairgp - Sair do grupo`,
+        `${p}nuke - Remover todos membros`,
+        `${p}addgold @user <qtd> - Dar gold`,
+        `${p}addxp @user <qtd> - Dar XP`,
+        `${p}listanegra <num> - Lista negra`,
+        `${p}block @user - Bloquear`,
+      ],
+    },
   }
 
-  // Verifica sub-menu
-  const subMenu = cmd === 'menu' ? (msg.args[0]?.toLowerCase() || 'menu') : cmd.replace('menu', '')
-  const menu = menus[subMenu] || menus['menu']
+  // Resolve o sub-menu a partir do comando
+  let subMenu = 'menu'
 
-  return buildMenu(menu.title, menu.items)
+  if (cmd === 'menu') {
+    // Se veio argumento como "menu figurinhas", extrai a chave
+    subMenu = args[0]?.toLowerCase() || 'menu'
+  } else if (cmd === 'configurarbot' || cmd === 'configurar-bot') {
+    subMenu = 'adm'
+  } else {
+    // Comandos como "menufigurinhas" -> remove "menu" do inicio
+    subMenu = cmd.replace('menu', '')
+  }
+
+  // Aliases para nomes com acento ou abreviacao
+  const aliases = {
+    fig: 'figurinhas',
+    figurinhas: 'figurinhas',
+    menufigurinhas: 'figurinhas',
+    brincadeiras: 'brincadeiras',
+    efeitos: 'efeitos',
+    adm: 'adm',
+    gold: 'gold',
+    download: 'downloads',
+    downloads: 'downloads',
+    baixar: 'downloads',
+    info: 'info',
+    jogos: 'jogos',
+    grupo: 'grupo',
+    anime: 'anime',
+    logos: 'logos',
+    sticker: 'sticker',
+    marcar: 'marcar',
+    vip: 'vip',
+    game: 'game',
+    dono: 'dono',
+    rpg: 'jogos',
+  }
+
+  const resolvedKey = aliases[subMenu] || subMenu
+  const menu = menus[resolvedKey] || menus['menu']
+
+  await reply(buildMenu(menu.title, menu.items))
 }
