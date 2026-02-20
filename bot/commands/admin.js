@@ -8,6 +8,12 @@ import {
   buildMenu, isOwner, formatDateBR, canExecute
 } from '../lib/utils.js'
 
+// Funcao auxiliar para normalizar JID (remove :device antes do @)
+function normalizeJid(jid) {
+  if (!jid) return ''
+  return jid.replace(/:\d+@/, '@')
+}
+
 export async function handleAdmin(ctx) {
   const { sock, msg, cmd, args, fullArgs, groupId, sender, grpSettings,
     groupMeta, isGroupAdmin, isBotAdmin, permLevel, botNumber } = ctx
@@ -31,7 +37,7 @@ export async function handleAdmin(ctx) {
       if (!isBotAdmin) return reply('Preciso ser admin para banir.')
       const target = getTarget()
       if (!target) return reply('Marque alguem ou cite uma mensagem.')
-      if (target === botNumber) return reply('Nao posso me banir.')
+      if (normalizeJid(target) === normalizeJid(botNumber)) return reply('Nao posso me banir.')
       if (isOwner(target)) return reply('Nao posso banir a dona.')
       try {
         await sock.groupParticipantsUpdate(groupId, [target], 'remove')
@@ -234,28 +240,46 @@ export async function handleAdmin(ctx) {
     }
 
     // === LINK DO GRUPO ===
+    // CORRECAO: Removido check "isBotAdmin" desnecessario.
+    // O groupInviteCode funciona se o bot for participante do grupo,
+    // independente de ser admin (depende das configs do grupo).
+    // Adicionado try/catch para tratar o erro real caso o bot nao tenha permissao.
     case 'linkgp': {
       if (!canExecute(groupId, sender, isGroupAdmin, 2)) return reply('Sem permissao.')
-      if (!isBotAdmin) return reply('Preciso ser admin.')
-      const code = await sock.groupInviteCode(groupId)
-      reply(`${botHeader('LINK DO GRUPO')}\nhttps://chat.whatsapp.com/${code}${botFooter()}`)
+      try {
+        const code = await sock.groupInviteCode(groupId)
+        reply(`${botHeader('LINK DO GRUPO')}\nhttps://chat.whatsapp.com/${code}${botFooter()}`)
+      } catch (e) {
+        reply('Nao consegui obter o link. Verifique se tenho permissao de admin no grupo.')
+      }
       break
     }
 
     // === NOME / DESC / FOTO DO GRUPO ===
+    // CORRECAO: Adicionado try/catch para #nomegp e #descgp.
+    // O WhatsApp pode permitir que membros editem info dependendo das configuracoes,
+    // entao nao bloqueamos com isBotAdmin previamente. Se falhar, tratamos o erro.
     case 'nomegp': {
       if (!canExecute(groupId, sender, isGroupAdmin, 3)) return reply('Apenas admins.')
       if (!fullArgs) return reply('Informe o novo nome. Ex: #nomegp Novo Nome')
-      await sock.groupUpdateSubject(groupId, fullArgs)
-      reply(`Nome do grupo alterado para: ${fullArgs}`)
+      try {
+        await sock.groupUpdateSubject(groupId, fullArgs)
+        reply(`Nome do grupo alterado para: ${fullArgs}`)
+      } catch (e) {
+        reply('Erro ao alterar nome. Verifique se tenho permissao de admin no grupo.')
+      }
       break
     }
 
     case 'descgp': {
       if (!canExecute(groupId, sender, isGroupAdmin, 3)) return reply('Apenas admins.')
       if (!fullArgs) return reply('Informe a nova descricao.')
-      await sock.groupUpdateDescription(groupId, fullArgs)
-      reply('Descricao do grupo atualizada.')
+      try {
+        await sock.groupUpdateDescription(groupId, fullArgs)
+        reply('Descricao do grupo atualizada.')
+      } catch (e) {
+        reply('Erro ao alterar descricao. Verifique se tenho permissao de admin no grupo.')
+      }
       break
     }
 
@@ -296,13 +320,37 @@ export async function handleAdmin(ctx) {
     }
 
     // === DELETAR MENSAGEM ===
+    // CORRECAO PRINCIPAL: O caminho para o ID da mensagem citada estava errado.
+    // Antes: msg.quoted.message?.key?.id (ERRADO - message nao tem key)
+    // Agora: msg.quoted.stanzaId || msg.quoted.id (caminho correto no Baileys)
+    // Tambem corrigido o "participant" que deve vir de msg.quoted.sender
     case 'deletar': {
       if (!canExecute(groupId, sender, isGroupAdmin, 2)) return reply('Sem permissao.')
       if (!isBotAdmin) return reply('Preciso ser admin.')
       if (!msg.quoted) return reply('Cite a mensagem que deseja apagar.')
       try {
-        await sock.sendMessage(groupId, { delete: { remoteJid: groupId, fromMe: false, id: msg.quoted.message?.key?.id || msg.key.id, participant: msg.quoted.sender } })
-        await sock.sendMessage(groupId, { delete: msg.key })
+        // Monta a key da mensagem citada corretamente
+        const quotedId = msg.quoted.stanzaId || msg.quoted.id || msg.quoted.key?.id
+        const quotedParticipant = msg.quoted.sender || msg.quoted.participant || msg.quoted.key?.participant
+
+        if (!quotedId) {
+          return reply('Nao consegui identificar a mensagem citada.')
+        }
+
+        // Deleta a mensagem citada
+        await sock.sendMessage(groupId, {
+          delete: {
+            remoteJid: groupId,
+            fromMe: false,
+            id: quotedId,
+            participant: quotedParticipant
+          }
+        })
+
+        // Tenta deletar o proprio comando tambem
+        try {
+          await sock.sendMessage(groupId, { delete: msg.key })
+        } catch {}
       } catch (e) {
         reply('Erro ao deletar: ' + e.message)
       }
@@ -328,7 +376,7 @@ export async function handleAdmin(ctx) {
       let count = 0
       for (const p of groupMeta.participants) {
         if (p.admin) continue
-        if (p.id === botNumber) continue
+        if (normalizeJid(p.id) === normalizeJid(botNumber)) continue
         try {
           await sock.profilePictureUrl(p.id, 'image')
         } catch {
@@ -381,7 +429,7 @@ export async function handleAdmin(ctx) {
       if (!isBotAdmin) return reply('Preciso ser admin.')
       for (const p of groupMeta.participants) {
         if (p.admin) continue
-        if (p.id === botNumber) continue
+        if (normalizeJid(p.id) === normalizeJid(botNumber)) continue
         try {
           await sock.groupParticipantsUpdate(groupId, [p.id], 'remove')
         } catch {}
@@ -530,7 +578,8 @@ export async function handleAdmin(ctx) {
       text += `Membros: ${groupMeta.participants.length}\n`
       text += `Prefixo: ${s.prefix}\n`
       text += `Max Adv: ${s.maxWarnings}\n`
-      text += `Cooldown: ${s.cmdCooldown}s\n\n`
+      text += `Cooldown: ${s.cmdCooldown}s\n`
+      text += `Bot Admin: ${isBotAdmin ? 'SIM' : 'NAO'}\n\n`
       text += `*Funcionalidades:*\n`
       toggles.forEach(([name, val]) => {
         text += `${val ? '[ON]' : '[OFF]'} ${name}\n`
