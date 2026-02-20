@@ -1146,7 +1146,7 @@ export async function handleAdmin(ctx) {
 
     // === CATCH ALL (toggles nao implementados) ===
     default: {
-      reply(`Comando admin "${cmd}" recebido. Em desenvolvimento.`)
+      reply(`Comando admin "${cmd}" recebido. Em desenvolvimentoo.`)
     }
   }
 }
