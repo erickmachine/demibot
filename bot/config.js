@@ -65,8 +65,8 @@ export default {
   // APIs externas (configurar conforme necessario)
   apis: {
     removeBg: 'MgL7kTucQvneKm211qbDddgB', // API key removebg
-    openai: '', // API key OpenAI/GPT
-    gemini: '', // API key Google Gemini
+    openai: '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', // API key OpenAI/GPT
+    gemini: 'AIzaSyBY2Oh8M4Bw_hpbwst3xwb58RCbFgk24Y0', // API key Google Gemini
     weather: '', // API key OpenWeather
     lastfm: '3286e8a06165ff26aef320ebad156f9f', // API key Last.fm
   },
