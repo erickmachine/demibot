@@ -68,6 +68,6 @@ export default {
     openai: '', // API key OpenAI/GPT
     gemini: '', // API key Google Gemini
     weather: '', // API key OpenWeather
-    lastfm: '', // API key Last.fm
+    lastfm: '3286e8a06165ff26aef320ebad156f9f', // API key Last.fm
   },
 }
