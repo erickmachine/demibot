@@ -8,12 +8,6 @@ import {
   buildMenu, isOwner, formatDateBR, canExecute
 } from '../lib/utils.js'
 
-// Funcao auxiliar para normalizar JID (remove :device antes do @)
-function normalizeJid(jid) {
-  if (!jid) return ''
-  return jid.replace(/:\d+@/, '@')
-}
-
 export async function handleAdmin(ctx) {
   const { sock, msg, cmd, args, fullArgs, groupId, sender, grpSettings,
     groupMeta, isGroupAdmin, isBotAdmin, permLevel, botNumber } = ctx
@@ -33,11 +27,11 @@ export async function handleAdmin(ctx) {
     // === BAN ===
     case 'ban':
     case 'band': {
-      if (!canExecute(groupId, sender, isGroupAdmin, 3)) return reply('Apenas admins podem usar este comando.')
-      if (!isBotAdmin) return reply('Preciso ser admin para banir.')
+      if (!isGroupAdmin && !isOwner(sender)) return reply('Apenas admins do grupo podem usar este comando.')
+      if (!isBotAdmin) return reply('O bot precisa ser administrador do grupo para banir membros. Promova o bot a admin primeiro.')
       const target = getTarget()
       if (!target) return reply('Marque alguem ou cite uma mensagem.')
-      if (normalizeJid(target) === normalizeJid(botNumber)) return reply('Nao posso me banir.')
+      if (target === botNumber) return reply('Nao posso me banir.')
       if (isOwner(target)) return reply('Nao posso banir a dona.')
       try {
         await sock.groupParticipantsUpdate(groupId, [target], 'remove')
@@ -55,8 +49,8 @@ export async function handleAdmin(ctx) {
 
     // === ADD ===
     case 'add': {
-      if (!canExecute(groupId, sender, isGroupAdmin, 3)) return reply('Apenas admins podem usar este comando.')
-      if (!isBotAdmin) return reply('Preciso ser admin para adicionar.')
+      if (!isGroupAdmin && !isOwner(sender)) return reply('Apenas admins do grupo podem usar este comando.')
+      if (!isBotAdmin) return reply('O bot precisa ser administrador do grupo para adicionar membros. Promova o bot a admin primeiro.')
       if (!args[0]) return reply('Informe o numero. Ex: #add 5511999999999')
       const num = formatJid(args[0])
       try {
@@ -180,20 +174,32 @@ export async function handleAdmin(ctx) {
 
     // === PROMOVER / REBAIXAR ===
     case 'promover': {
-      if (!canExecute(groupId, sender, isGroupAdmin, 3)) return reply('Apenas admins.')
-      if (!isBotAdmin) return reply('Preciso ser admin.')
+      if (!isGroupAdmin && !isOwner(sender)) return reply('Apenas admins do grupo podem usar este comando.')
+      if (!isBotAdmin) return reply('O bot precisa ser administrador do grupo para promover membros. Promova o bot a admin primeiro.')
       const target = getTarget()
       if (!target) return reply('Marque alguem.')
-      await sock.groupParticipantsUpdate(groupId, [target], 'promote')
+      try {
+        await sock.groupParticipantsUpdate(groupId, [target], 'promote')
+        await replyMentions(`${botHeader('PROMOVIDO')}\n${mention(target)} foi promovido a admin!${botFooter()}`, [target])
+        db.logActivity(groupId, sender, 'promover', `Promoveu ${extractNumber(target)}`)
+      } catch (e) {
+        reply('Erro ao promover: ' + e.message)
+      }
       break
     }
 
     case 'rebaixar': {
-      if (!canExecute(groupId, sender, isGroupAdmin, 3)) return reply('Apenas admins.')
-      if (!isBotAdmin) return reply('Preciso ser admin.')
+      if (!isGroupAdmin && !isOwner(sender)) return reply('Apenas admins do grupo podem usar este comando.')
+      if (!isBotAdmin) return reply('O bot precisa ser administrador do grupo para rebaixar membros. Promova o bot a admin primeiro.')
       const target = getTarget()
       if (!target) return reply('Marque alguem.')
-      await sock.groupParticipantsUpdate(groupId, [target], 'demote')
+      try {
+        await sock.groupParticipantsUpdate(groupId, [target], 'demote')
+        await replyMentions(`${botHeader('REBAIXADO')}\n${mention(target)} foi rebaixado.${botFooter()}`, [target])
+        db.logActivity(groupId, sender, 'rebaixar', `Rebaixou ${extractNumber(target)}`)
+      } catch (e) {
+        reply('Erro ao rebaixar: ' + e.message)
+      }
       break
     }
 
@@ -240,53 +246,35 @@ export async function handleAdmin(ctx) {
     }
 
     // === LINK DO GRUPO ===
-    // CORRECAO: Removido check "isBotAdmin" desnecessario.
-    // O groupInviteCode funciona se o bot for participante do grupo,
-    // independente de ser admin (depende das configs do grupo).
-    // Adicionado try/catch para tratar o erro real caso o bot nao tenha permissao.
     case 'linkgp': {
       if (!canExecute(groupId, sender, isGroupAdmin, 2)) return reply('Sem permissao.')
-      try {
-        const code = await sock.groupInviteCode(groupId)
-        reply(`${botHeader('LINK DO GRUPO')}\nhttps://chat.whatsapp.com/${code}${botFooter()}`)
-      } catch (e) {
-        reply('Nao consegui obter o link. Verifique se tenho permissao de admin no grupo.')
-      }
+      if (!isBotAdmin) return reply('O bot precisa ser administrador do grupo para gerar link. Promova o bot a admin primeiro.')
+      const code = await sock.groupInviteCode(groupId)
+      reply(`${botHeader('LINK DO GRUPO')}\nhttps://chat.whatsapp.com/${code}${botFooter()}`)
       break
     }
 
     // === NOME / DESC / FOTO DO GRUPO ===
-    // CORRECAO: Adicionado try/catch para #nomegp e #descgp.
-    // O WhatsApp pode permitir que membros editem info dependendo das configuracoes,
-    // entao nao bloqueamos com isBotAdmin previamente. Se falhar, tratamos o erro.
     case 'nomegp': {
       if (!canExecute(groupId, sender, isGroupAdmin, 3)) return reply('Apenas admins.')
       if (!fullArgs) return reply('Informe o novo nome. Ex: #nomegp Novo Nome')
-      try {
-        await sock.groupUpdateSubject(groupId, fullArgs)
-        reply(`Nome do grupo alterado para: ${fullArgs}`)
-      } catch (e) {
-        reply('Erro ao alterar nome. Verifique se tenho permissao de admin no grupo.')
-      }
+      await sock.groupUpdateSubject(groupId, fullArgs)
+      reply(`Nome do grupo alterado para: ${fullArgs}`)
       break
     }
 
     case 'descgp': {
       if (!canExecute(groupId, sender, isGroupAdmin, 3)) return reply('Apenas admins.')
       if (!fullArgs) return reply('Informe a nova descricao.')
-      try {
-        await sock.groupUpdateDescription(groupId, fullArgs)
-        reply('Descricao do grupo atualizada.')
-      } catch (e) {
-        reply('Erro ao alterar descricao. Verifique se tenho permissao de admin no grupo.')
-      }
+      await sock.groupUpdateDescription(groupId, fullArgs)
+      reply('Descricao do grupo atualizada.')
       break
     }
 
     case 'fotogp':
     case 'setfotogp': {
-      if (!canExecute(groupId, sender, isGroupAdmin, 3)) return reply('Apenas admins.')
-      if (!isBotAdmin) return reply('Preciso ser admin.')
+      if (!isGroupAdmin && !isOwner(sender)) return reply('Apenas admins do grupo podem usar este comando.')
+      if (!isBotAdmin) return reply('O bot precisa ser administrador do grupo para mudar a foto. Promova o bot a admin primeiro.')
       if (!msg.quoted?.message?.imageMessage && !msg.message?.imageMessage) {
         return reply('Marque uma imagem ou envie com a legenda #fotogp')
       }
@@ -303,54 +291,40 @@ export async function handleAdmin(ctx) {
     // === ABRIR / FECHAR GRUPO ===
     case 'fechargp':
     case 'colloportus': {
-      if (!canExecute(groupId, sender, isGroupAdmin, 3)) return reply('Apenas admins.')
-      if (!isBotAdmin) return reply('Preciso ser admin.')
-      await sock.groupSettingUpdate(groupId, 'announcement')
-      reply(`${botHeader('GRUPO FECHADO')}\nApenas admins podem enviar mensagens agora.${botFooter()}`)
+      if (!isGroupAdmin && !isOwner(sender)) return reply('Apenas admins do grupo podem usar este comando.')
+      if (!isBotAdmin) return reply('O bot precisa ser administrador do grupo para fechar o grupo. Promova o bot a admin primeiro.')
+      try {
+        await sock.groupSettingUpdate(groupId, 'announcement')
+        reply(`${botHeader('GRUPO FECHADO')}\nApenas admins podem enviar mensagens agora.${botFooter()}`)
+        db.logActivity(groupId, sender, 'fechargp', 'Fechou o grupo')
+      } catch (e) {
+        reply('Erro ao fechar grupo: ' + e.message)
+      }
       break
     }
 
     case 'abrirgp':
     case 'alohomora': {
-      if (!canExecute(groupId, sender, isGroupAdmin, 3)) return reply('Apenas admins.')
-      if (!isBotAdmin) return reply('Preciso ser admin.')
-      await sock.groupSettingUpdate(groupId, 'not_announcement')
-      reply(`${botHeader('GRUPO ABERTO')}\nTodos podem enviar mensagens agora.${botFooter()}`)
+      if (!isGroupAdmin && !isOwner(sender)) return reply('Apenas admins do grupo podem usar este comando.')
+      if (!isBotAdmin) return reply('O bot precisa ser administrador do grupo para abrir o grupo. Promova o bot a admin primeiro.')
+      try {
+        await sock.groupSettingUpdate(groupId, 'not_announcement')
+        reply(`${botHeader('GRUPO ABERTO')}\nTodos podem enviar mensagens agora.${botFooter()}`)
+        db.logActivity(groupId, sender, 'abrirgp', 'Abriu o grupo')
+      } catch (e) {
+        reply('Erro ao abrir grupo: ' + e.message)
+      }
       break
     }
 
     // === DELETAR MENSAGEM ===
-    // CORRECAO PRINCIPAL: O caminho para o ID da mensagem citada estava errado.
-    // Antes: msg.quoted.message?.key?.id (ERRADO - message nao tem key)
-    // Agora: msg.quoted.stanzaId || msg.quoted.id (caminho correto no Baileys)
-    // Tambem corrigido o "participant" que deve vir de msg.quoted.sender
     case 'deletar': {
       if (!canExecute(groupId, sender, isGroupAdmin, 2)) return reply('Sem permissao.')
-      if (!isBotAdmin) return reply('Preciso ser admin.')
+      if (!isBotAdmin) return reply('O bot precisa ser administrador do grupo para deletar mensagens. Promova o bot a admin primeiro.')
       if (!msg.quoted) return reply('Cite a mensagem que deseja apagar.')
       try {
-        // Monta a key da mensagem citada corretamente
-        const quotedId = msg.quoted.stanzaId || msg.quoted.id || msg.quoted.key?.id
-        const quotedParticipant = msg.quoted.sender || msg.quoted.participant || msg.quoted.key?.participant
-
-        if (!quotedId) {
-          return reply('Nao consegui identificar a mensagem citada.')
-        }
-
-        // Deleta a mensagem citada
-        await sock.sendMessage(groupId, {
-          delete: {
-            remoteJid: groupId,
-            fromMe: false,
-            id: quotedId,
-            participant: quotedParticipant
-          }
-        })
-
-        // Tenta deletar o proprio comando tambem
-        try {
-          await sock.sendMessage(groupId, { delete: msg.key })
-        } catch {}
+        await sock.sendMessage(groupId, { delete: { remoteJid: groupId, fromMe: false, id: msg.quoted.message?.key?.id || msg.key.id, participant: msg.quoted.sender } })
+        await sock.sendMessage(groupId, { delete: msg.key })
       } catch (e) {
         reply('Erro ao deletar: ' + e.message)
       }
@@ -371,12 +345,12 @@ export async function handleAdmin(ctx) {
 
     // === BAN GHOST (sem foto de perfil) ===
     case 'banghost': {
-      if (!canExecute(groupId, sender, isGroupAdmin, 3)) return reply('Apenas admins.')
-      if (!isBotAdmin) return reply('Preciso ser admin.')
+      if (!isGroupAdmin && !isOwner(sender)) return reply('Apenas admins do grupo podem usar este comando.')
+      if (!isBotAdmin) return reply('O bot precisa ser administrador do grupo para remover membros. Promova o bot a admin primeiro.')
       let count = 0
       for (const p of groupMeta.participants) {
         if (p.admin) continue
-        if (normalizeJid(p.id) === normalizeJid(botNumber)) continue
+        if (p.id === botNumber) continue
         try {
           await sock.profilePictureUrl(p.id, 'image')
         } catch {
@@ -391,8 +365,8 @@ export async function handleAdmin(ctx) {
     // === BAN FAKES ===
     case 'banfakes':
     case 'banfake': {
-      if (!canExecute(groupId, sender, isGroupAdmin, 3)) return reply('Apenas admins.')
-      if (!isBotAdmin) return reply('Preciso ser admin.')
+      if (!isGroupAdmin && !isOwner(sender)) return reply('Apenas admins do grupo podem usar este comando.')
+      if (!isBotAdmin) return reply('O bot precisa ser administrador do grupo para remover membros. Promova o bot a admin primeiro.')
       let count = 0
       for (const p of groupMeta.participants) {
         if (p.admin) continue
@@ -426,10 +400,10 @@ export async function handleAdmin(ctx) {
     // === NUKE ===
     case 'nuke': {
       if (!isOwner(sender)) return reply('Apenas a dona pode usar este comando.')
-      if (!isBotAdmin) return reply('Preciso ser admin.')
+      if (!isBotAdmin) return reply('O bot precisa ser administrador do grupo para remover membros. Promova o bot a admin primeiro.')
       for (const p of groupMeta.participants) {
         if (p.admin) continue
-        if (normalizeJid(p.id) === normalizeJid(botNumber)) continue
+        if (p.id === botNumber) continue
         try {
           await sock.groupParticipantsUpdate(groupId, [p.id], 'remove')
         } catch {}
@@ -505,8 +479,8 @@ export async function handleAdmin(ctx) {
     // === ACEITAR SOLICITACOES ===
     case 'aceitar':
     case 'aceitarmembro': {
-      if (!canExecute(groupId, sender, isGroupAdmin, 3)) return reply('Apenas admins.')
-      if (!isBotAdmin) return reply('Preciso ser admin.')
+      if (!isGroupAdmin && !isOwner(sender)) return reply('Apenas admins do grupo podem usar este comando.')
+      if (!isBotAdmin) return reply('O bot precisa ser administrador do grupo para aceitar solicitacoes. Promova o bot a admin primeiro.')
       try {
         const pending = await sock.groupRequestParticipantsList(groupId)
         if (pending.length === 0) return reply('Nenhuma solicitacao pendente.')
@@ -578,8 +552,7 @@ export async function handleAdmin(ctx) {
       text += `Membros: ${groupMeta.participants.length}\n`
       text += `Prefixo: ${s.prefix}\n`
       text += `Max Adv: ${s.maxWarnings}\n`
-      text += `Cooldown: ${s.cmdCooldown}s\n`
-      text += `Bot Admin: ${isBotAdmin ? 'SIM' : 'NAO'}\n\n`
+      text += `Cooldown: ${s.cmdCooldown}s\n\n`
       text += `*Funcionalidades:*\n`
       toggles.forEach(([name, val]) => {
         text += `${val ? '[ON]' : '[OFF]'} ${name}\n`
