@@ -683,4 +683,56 @@ export function getGroupPrefixes(groupId) {
   return list.map(r => r.prefix)
 }
 
+// --- GOLD RANKING ---
+export function getGoldRanking(groupId, limit = 15) {
+  return db.prepare('SELECT * FROM members WHERE odGroupId = ? AND gold > 0 ORDER BY gold DESC LIMIT ?').all(groupId, limit)
+}
+
+// --- GOLD COMMANDS (custo de gold por comando) ---
+export function addGoldCmd(groupId, cmdName, goldCost) {
+  db.prepare('INSERT OR REPLACE INTO gold_cmds (groupId, cmdName, goldCost) VALUES (?, ?, ?)').run(groupId, cmdName.toLowerCase(), goldCost)
+}
+
+export function removeGoldCmd(groupId, cmdName) {
+  db.prepare('DELETE FROM gold_cmds WHERE groupId = ? AND cmdName = ?').run(groupId, cmdName.toLowerCase())
+}
+
+export function getGoldCmdCost(groupId, cmdName) {
+  const r = db.prepare('SELECT goldCost FROM gold_cmds WHERE groupId = ? AND cmdName = ?').get(groupId, cmdName.toLowerCase())
+  return r ? r.goldCost : 0
+}
+
+// --- PREMIUM COMMANDS ---
+export function addPremiumCmd(groupId, cmdName) {
+  db.prepare('INSERT OR IGNORE INTO premium_cmds (groupId, cmdName) VALUES (?, ?)').run(groupId, cmdName.toLowerCase())
+}
+
+export function removePremiumCmd(groupId, cmdName) {
+  db.prepare('DELETE FROM premium_cmds WHERE groupId = ? AND cmdName = ?').run(groupId, cmdName.toLowerCase())
+}
+
+export function isPremiumCmd(groupId, cmdName) {
+  return !!db.prepare('SELECT 1 FROM premium_cmds WHERE groupId = ? AND cmdName = ?').get(groupId, cmdName.toLowerCase())
+}
+
+// --- EQUIPES (Teams) ---
+export function addTeam(groupId, name, createdBy) {
+  // Usar notes table como fallback ou criar logica simples
+  db.prepare('INSERT INTO notes (groupId, text, createdBy) VALUES (?, ?, ?)').run(groupId, `[TEAM]${name}`, createdBy)
+}
+
+export function getTeams(groupId) {
+  const teams = db.prepare("SELECT * FROM notes WHERE groupId = ? AND text LIKE '[TEAM]%'").all(groupId)
+  return teams.map(t => ({ name: t.text.replace('[TEAM]', ''), id: t.odId, members: [] }))
+}
+
+export function removeTeam(groupId, name) {
+  db.prepare("DELETE FROM notes WHERE groupId = ? AND text = ?").run(groupId, `[TEAM]${name}`)
+}
+
+export function joinTeam(groupId, name, userId) {
+  // Simplificado - registra entrada
+  db.prepare('INSERT INTO notes (groupId, text, createdBy) VALUES (?, ?, ?)').run(groupId, `[TEAM_MEMBER]${name}|${userId}`, userId)
+}
+
 export default db
